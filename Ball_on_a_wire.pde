@@ -1,110 +1,126 @@
-//
-//X and Y values for ball.
-//
-float x1 = 300;
-float y1 = 400;
-float x2 = -0.75;
+/*
+ * Research sag in relation to a catenary
+ */
+private static final int W = 600;               // Width of canvas
+private static final int H = 500;               // Height of canvas
+private static final float Y_MARGIN = 25f;      // Margin above and below flight path
+private static final float DF = -0.75f;         // Dampening factor
+private static final float X_STEP = 20f;        // Line length to create catenary
+private static final float X_ORIGIN = 300f;     // X value of first catenary pole
+private static final float Y_ORIGIN = -100f;    // Y value of first catenary pole
+private static final float Y_TOL = 0.01f;       // If the Y of catenary is within Y_TOL to Y_ORIGIN, stop drawing
+private static final float TF = 3.5f / 1000f;   // Accelerates time
+private static float SF = 320f;                 // Stretch factor for catenary
+private static final float X_START = -200f;      // Horizontal position of start left pole
+private static final float Y_START = cat(X_START, SF);
+private static final float DIAM = 15f;          // Diameter of ball
+private static final float Y_OFFSET = 15f;      // Image y offset
+private static final float X_OFFSET = 27f;      // Image x offset
+private static final float Y_RANGE = (H - Y_START) / 2f; 
 
-float speed = 0;
-float gravity = -0.1;
+float x;                                        // X of ball
+float y = H;                                    // Y of ball
+float yPrev = y;                                // Lagging value of object
+float velocity = 0f;                            // Velocity of ball
+float gravity = -9.8f;                          // Gravity
+float t0 = 0f;                                  // Value to reset time
+float tPrev = 0f;                               // Lagging value of time
+
+
 
 //
-//Stretch factor for catenary.
+// Function of catenary equation
 //
-float a = 320f;
-
-void setup()
+static float cat(float x, float sf)
 {
-  size(600, 500);
-  strokeWeight(1);
+  return sf / 2 * (exp(x / sf) + exp(-x / sf));
 }
+
+//
+// Run once
+//
+void setup()
+{ 
+  size(W, H); // Set canvas size
+  fill(150); // Set colour
+  stroke(0); // Set border width
+}
+
+//
+// Run loop
+//
 void draw()
 {
-  background(255);
-  translate(0, height);
+  translate(0, height); // Invert ordinate
   scale(1, -1);
-  //
-  //
-  //Catenary
-  //
-  //
+  background(255);
+  //background(87, 223, 250); // Set background to blue
 
   //
-  //Set stretch factor value
+  // x and y values for the first point to construct a line
   //
+  float catXPrev = X_START;
 
   //
-  //x and y values for the first point to construct a line
+  // Draw bouncing ball.
   //
-  float xprev, yprev;
-  xprev = -200f;
-  yprev = a/2*(exp(xprev/a)+exp(-xprev/a));
-
+  float t = millis() * TF; // Accelerated time, in seconds
+  float deltaT = tPrev == 0f ? 0f : t - tPrev; // Difference between time and lagging time
+   
+  //x = (X_START + catXPrev) * 0.5; // Set x value of ball to midpoint of catenary (constant)
+  x = 0f; //!
+  y = gravity * 0.5 * deltaT * deltaT + velocity * deltaT + yPrev; // Compute height of projectile
+  
+  velocity += -DF * gravity * deltaT; // Compute new velocity
+  
   //
-  //Runs until x = 200, creates lines to form a catenary
+  // Create bounce.
   //
-  for (float x = -200; x < 200; x+= 10f) 
+  float catY = cat(x, SF) + DIAM / 2; // Vertical position of catenary
+  
+  if (y <= catY)
   {
-    //
-    //Formula for a catenary
-    //
-    float y = a/2*(exp(x/a)+exp(-x/a));
-
-    line(xprev+300, yprev-100, x+300, y-100);
-
-    //
-    //Sets newly created x and y to xprev/yprev so the next line
-    //created starts where the last line created ends
-    //
-    xprev = x;
-    yprev = y;
+    velocity *= DF; // Reverse direction and dampening factor (coefficient of restitution)
+    y = catY;
   }
+  
+  //
+  // Draw bird.
+  //
+  // PImage img;
+  // img = loadImage("Bird.png");
+  // image(img, x + X_ORIGIN - X_OFFSET, y + Y_ORIGIN - Y_OFFSET); 
+  ellipse(x + X_ORIGIN, y + Y_ORIGIN, DIAM, DIAM);
+  
+  //
+  // Discontinue drawing when motion stops.
+  //
+  if (y == catY && abs(y - yPrev) <= Y_TOL)
+    noLoop();
+  
+  yPrev = y; // Set lagging values
+  tPrev = t;
 
-
   //
+  // Draw catenary.
   //
-  //Bouncing ball.
-  //
-  //
-
-  int m = millis()/1000;
-
-  fill(150);
-  stroke(0);
-
-  //
-  //Drawing circle.
-  //
-  ellipse(x1, y1, 15, 15);
-
-  //
-  //Stops oscillation at the end.
-  //
-  if ( m == 10) 
+  float catYPrev = Y_START;
+  
+  do
   {
-    speed = 0;
-    gravity = 0;
-  }
+    float x = catXPrev + X_STEP; // Advance to next horizontal value   
+    float y = cat(x, SF); // Next vertical value
+    
+    //
+    // Draw line segment.
+    //
+    line(catXPrev + X_ORIGIN, catYPrev + Y_ORIGIN, x + X_ORIGIN, y + Y_ORIGIN);
 
-  //
-  //Applying velocity.
-  //
-  y1 = y1 + speed;
-
-  //
-  //Applying gravity.
-  //
-  speed = speed + gravity;
-
-  //
-  //Creating bounce.
-  //
-  if (y1 < 0+5) 
-  {
-    speed = speed * x2 ;
-
-    x2 = x2 - 0.01 * gravity;
-
-    y1 = 0+5;
-  }
+    //
+    // Set newly created x and y to xprev/yprev so the next line
+    // created starts where the last line created ends
+    //
+    catXPrev = x; // Lagging values for catenary x and y
+    catYPrev = y;    
+  } while (Y_START - catYPrev > Y_TOL); // Stop at opposite pole  
 }
